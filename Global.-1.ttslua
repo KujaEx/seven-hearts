@@ -1,0 +1,1606 @@
+-- constants
+PLAYERS_ORDER = {"Blue", "Red", "Green", "Yellow"}
+PLAYERS_COLOR_CODE = {"#00BFFF", "#FF5555", "#00FF00", "#FFFF00"}
+PLAYERS_HAND_GUID = {"b7b24a", "b99541", "e3451d", "24b4ef"}
+PLAYERS_BOT_AVATARS_GUID = {"76cbcb", "b580d5", "871a20", "5dcbb5"}
+DECK_GUID = "c959dd"
+DECK_ZONE_GUID = "10d466"
+DROP_ZONE_GUID = "ec1507"
+DISCARD_ZONE_GUID = "f14c42"
+
+FIRE_CARDS = {"Fire Bolt", "Forte"}
+WATER_CARDS = {"Hydro Cannon", "Tear"}
+WIND_CARDS = {"Spark Edge", "Refreshing Veil"}
+EARTH_CARDS = {"Earth Breaker", "Earth Guard"}
+SPECIAL_CARDS = {"Chrono Drive", "Lost Mobius", "Crescent Eye"}
+
+-- game logic variables
+playerStartHP = 10
+playersHP = {0, 0, 0, 0}
+result = {0, 0, 0, 0}
+activePlayer = 0
+startDeal = 5
+deckCards = 46
+damageCounter = 0
+reverseTurnOrder = false
+botMode = true
+botThinkingTime = 3
+teamMode = false
+dropZone = nil
+deckZone = nil
+discardZone = nil
+deck = nil
+cardsInDropZone = 0
+topCard = ""
+originalDeckJson = nil
+playersBotAvatars = {}
+
+-- display logic variables
+infoOverlayVisibleFor = {}
+rulesOverlayVisibleFor = {}
+infoVisible = false
+rulesVisible = false
+
+--[[ The onLoad event is called after the game save finishes loading. --]]
+function onLoad()
+  -- get Zones
+  dropZone = getObjectFromGUID(DROP_ZONE_GUID)
+  deckZone = getObjectFromGUID(DECK_ZONE_GUID)
+  discardZone = getObjectFromGUID(DISCARD_ZONE_GUID)
+
+  -- get bot avatar 3d objects
+  for i, gui in ipairs(PLAYERS_BOT_AVATARS_GUID) do
+    table.insert(playersBotAvatars, i, getObjectFromGUID(gui))
+  end
+
+  -- save original deck
+  local deckObj = getObjectFromGUID(DECK_GUID)
+  if deckObj then
+    originalDeckJson = deckObj.getJSON()
+  else
+    print("Couldn't find deck to save!")
+  end
+
+  -- set up counter
+  startTimerCounter()
+
+  -- set up image displays
+  UI.setCustomAssets({
+    {
+      name = "myInfoImage",
+      url = "https://steamusercontent-a.akamaihd.net/ugc/53588031926054247/56188D98B675061039BF6985A4ED0B3142F1C9C3/"
+    },
+    {
+      name = "myRulesImage",
+      url = "https://steamusercontent-a.akamaihd.net/ugc/53589216353455743/22A7731F60ED8B7A5333D9144268549A6208B59C/"
+    },
+    {
+      name = "myElementsImage",
+      url = "https://steamusercontent-a.akamaihd.net/ugc/53588581598317479/9DDBD5C62E78F7047616585BA6BD25423AB64415/"
+    },
+    {
+      name = "arrowCW",
+      url = "https://steamusercontent-a.akamaihd.net/ugc/53588581607512612/1533F1F6217A68D8355CF1C0B91966836802787A/"
+    },
+    {
+      name = "arrowCCW",
+      url = "https://steamusercontent-a.akamaihd.net/ugc/53588581607514456/7E378DD96DB36FA6E7A86E0EAAD710FF32DD791E/"
+    }
+  })
+
+  -- start timers for UI
+  startTimerBotAvatars()
+  startTimerActivePlayer()
+  startTimerDamageCounter()
+end
+
+-- color start button red if hovered with mouse
+function onStartGameHover(player_color, ui_element_id)
+    UI.setAttribute("startButton", "color", "#FF4444")
+end
+
+-- color bot button white if not hovered with mouse
+function onStartGameUnhover(player_color, ui_element_id)
+    UI.setAttribute("startButton", "color", "#FFFFFF")
+end
+
+-- toogle if bots are used for unseated players
+function toggleBotMode()
+  botMode = not botMode
+  local buttonText = botMode and "NPCs: ON" or "NPCs: OFF"
+  UI.setAttribute("botButton", "text", buttonText)
+  if botMode == false then
+    for i, color in ipairs(playersBotAvatars) do
+      playersBotAvatars[i].setInvisibleTo(PLAYERS_ORDER)
+    end
+  end
+end
+
+-- color bot button red if hovered with mouse
+function onBotHover(player_color, ui_element_id)
+    UI.setAttribute("botButton", "color", "#FF4444")
+end
+
+-- color bot button white if not hovered with mouse
+function onBotUnhover(player_color, ui_element_id)
+    UI.setAttribute("botButton", "color", "#FFFFFF")
+end
+
+-- toogle if teams are made between red/yellow and blue/green
+function toggleTeamMode()
+  teamMode = not teamMode
+  local buttonText = teamMode and "Teams: ON" or "Teams: OFF"
+  UI.setAttribute("teamButton", "text", buttonText)
+
+  if teamMode then
+    UI.setAttribute("counterPanelTeam", "visibility", "")
+    UI.setAttribute("counterPanel", "visibility", "hidden")
+  else
+    UI.setAttribute("counterPanelTeam", "visibility", "hidden")
+    UI.setAttribute("counterPanel", "visibility", "")
+  end
+end
+
+-- color team button red if hovered with mouse
+function onTeamHover(player_color, ui_element_id)
+    UI.setAttribute("teamButton", "color", "#FF4444")
+end
+
+-- color team button white if not hovered with mouse
+function onTeamUnhover(player_color, ui_element_id)
+    UI.setAttribute("teamButton", "color", "#FFFFFF")
+end
+
+-- toogle if player sees info overlay
+function toggleInfoOverlay(player, _, _)
+  local color = player.color
+
+  -- toogle in table color of player who pressed button
+  if infoOverlayVisibleFor[color] then
+    infoOverlayVisibleFor[color] = false
+  else
+    infoOverlayVisibleFor[color] = true
+  end
+
+  updateInfoOverlayVisibility()
+end
+
+-- set visibility of info overlay with concatinated player colors
+function updateInfoOverlayVisibility()
+  local visibleFor = ""
+
+  -- concatenate the colors with "|"
+  for color, state in pairs(infoOverlayVisibleFor) do
+    if state then
+      visibleFor = visibleFor .. color .. "|"
+    end
+  end
+
+  if #visibleFor > 0 then
+    -- remove last "|" if there are any players who pressed button
+    visibleFor = visibleFor:sub(1, -2)
+  else
+    -- if nobody pressed button, make UI hidden again
+    visibleFor = "hidden"
+  end
+
+  UI.setAttribute("infoOverlay", "visibility", visibleFor)
+end
+
+-- color info button red if hovered with mouse
+function onInfoHover(player_color, ui_element_id)
+    UI.setAttribute("infoButton", "color", "#FF4444")
+end
+
+-- color info button white if not hovered with mouse
+function onInfoUnhover(player_color, ui_element_id)
+    UI.setAttribute("infoButton", "color", "#FFFFFF")
+end
+
+-- toogle if player sees rules overlay
+function toggleRulesOverlay(player, _, _)
+  local color = player.color
+
+  -- toogle in table color of player who pressed button
+  if rulesOverlayVisibleFor[color] then
+    rulesOverlayVisibleFor[color] = false
+  else
+    rulesOverlayVisibleFor[color] = true
+  end
+
+  updateRulesOverlayVisibility()
+end
+
+-- set visibility of rules overlay with concatinated player colors
+function updateRulesOverlayVisibility()
+  local visibleFor = ""
+
+  -- concatenate the colors with "|"
+  for color, state in pairs(rulesOverlayVisibleFor) do
+    if state then
+      visibleFor = visibleFor .. color .. "|"
+    end
+  end
+
+  if #visibleFor > 0 then
+    -- remove last "|" if there are any players who pressed button
+    visibleFor = visibleFor:sub(1, -2)
+  else
+    -- if nobody pressed button, make UI hidden again
+    visibleFor = "hidden"
+  end
+
+  UI.setAttribute("rulesOverlay", "visibility", visibleFor)
+end
+
+-- color rules button red if hovered with mouse
+function onRulesHover(player_color, ui_element_id)
+    UI.setAttribute("rulesButton", "color", "#FF4444")
+end
+
+-- color rules button white if not hovered with mouse
+function onRulesUnhover(player_color, ui_element_id)
+    UI.setAttribute("rulesButton", "color", "#FFFFFF")
+end
+
+-- color skip button red if hovered with mouse
+function onSkipHover(player_color, ui_element_id)
+    UI.setAttribute("skipButton", "color", "#FF4444")
+end
+
+-- color skip button white if not hovered with mouse
+function onSkipUnhover(player_color, ui_element_id)
+    UI.setAttribute("skipButton", "color", "#FFFFFF")
+end
+
+-- color take damage button red if hovered with mouse
+function onTakeDamageHover(player_color, ui_element_id)
+    UI.setAttribute("takeDamageButton", "color", "#FF4444")
+end
+
+-- color dake damage button white if not hovered with mouse
+function onTakeDamageUnhover(player_color, ui_element_id)
+    UI.setAttribute("takeDamageButton", "color", "#FFFFFF")
+end
+
+-- color new game button red if hovered with mouse
+function onNewGameHover(player_color, ui_element_id)
+    UI.setAttribute("newGameButton", "color", "#FF4444")
+end
+
+-- color new game button white if not hovered with mouse
+function onNewGameUnhover(player_color, ui_element_id)
+    UI.setAttribute("newGameButton", "color", "#FFFFFF")
+end
+
+-- color new game button for teams red if hovered with mouse
+function onNewGameTeamHover(player_color, ui_element_id)
+    UI.setAttribute("newGameButtonTeam", "color", "#FF4444")
+end
+
+-- color new game button for teams white if not hovered with mouse
+function onNewGameTeamUnhover(player_color, ui_element_id)
+    UI.setAttribute("newGameButtonTeam", "color", "#FFFFFF")
+end
+
+function updateTurnOrderImage()
+  local imageName = reverseTurnOrder and "arrowCCW" or "arrowCW"
+  UI.setAttribute("turnOrderImage", "image", imageName)
+end
+
+-- timer for counting cards
+function startTimerCounter()
+  Timer.create({
+    identifier = "cardsCounterUpdater",
+    function_name = "showCounter",
+    delay = 0.25,
+    repetitions = 0
+  })
+end
+
+-- timer for counting cards
+function startTimerActivePlayer()
+  Timer.create({
+    identifier = "activePlayerUpdater",
+    function_name = "showActivePlayer",
+    delay = 0.25,
+    repetitions = 0
+  })
+end
+
+-- timer for display current damage
+function startTimerDamageCounter()
+  Timer.create({
+    identifier = "damageCounterUpdater",
+    function_name = "showCurrentDamage",
+    delay = 0.25,
+    repetitions = 0
+  })
+end
+
+-- timer for counting cards
+function startTimerBotAvatars()
+  Timer.create({
+    identifier = "showBotAvatarUpdater",
+    function_name = "showBotAvatars",
+    delay = 1,
+    repetitions = 0
+  })
+end
+
+-- cound cards in zone and hands
+function showCounter()
+  local objects = deckZone.getObjects()
+  local count = 0
+
+  for _, obj in ipairs(objects) do
+    if obj.tag == "Deck" then
+      count = count + obj.getQuantity()
+    elseif obj.tag == "Card" then
+      count = count + 1
+    end
+  end
+
+  deckCards = count
+
+  if not teamMode then
+    -- show deck counter
+    UI.setAttribute("deckCounter", "text", "Deck: " .. deckCards .. " Cards")
+
+    -- show hp and hand card count for each player
+    for i, color in ipairs(PLAYERS_ORDER) do
+      local handObjs = Player[color].getHandObjects()
+      UI.setAttribute(color:lower() .. "Counter", "text",
+      "Player " .. color .. ": \n" .. playersHP[i] .. " HP, ".. #handObjs .. " Cards")
+    end
+  else
+    -- show deck counter
+    UI.setAttribute("deckCounter2", "text", "Deck: " .. deckCards .. " Cards")
+
+    local countOrange = 0
+    local countTeal = 0
+    -- show hp and hand card count for each player, count team points
+    for i, color in ipairs(PLAYERS_ORDER) do
+      local handObjs = Player[color].getHandObjects()
+      UI.setAttribute(color:lower() .. "Counter2", "text",
+      "Player " .. color .. ": " .. playersHP[i] .. " HP, ".. #handObjs .. " Cards")
+      if i%2 == 0 then
+        -- if team orange (red=2 or yellow=4)
+        countOrange = countOrange + playersHP[i] + #handObjs
+      else
+        -- if team teal (blue=1 or green=2)
+        countTeal = countTeal + playersHP[i] + #handObjs
+      end
+    end
+    UI.setAttribute("orange", "text",
+      "Team Orange (" .. countOrange .. " Points)")
+    UI.setAttribute("teal", "text",
+      "Team Teal (" .. countTeal .. " Points)")
+  end
+end
+
+-- show bot avatars if bot mode on and not seated player
+function showBotAvatars()
+  if botMode == false then
+    return
+  end
+
+  for i, color in ipairs(PLAYERS_ORDER) do
+    if Player[color].seated then
+      playersBotAvatars[i].setInvisibleTo(PLAYERS_ORDER)
+    else
+      playersBotAvatars[i].setInvisibleTo({})
+    end
+  end
+end
+
+-- show active player
+function showActivePlayer()
+  if activePlayer ~= 0 then
+    UI.setAttribute("playerName", "text", PLAYERS_ORDER[activePlayer])
+    UI.setAttribute("playerName", "color", PLAYERS_COLOR_CODE[activePlayer])
+  end
+end
+
+-- update UI for active player
+function updateTurnUI()
+  UI.setAttribute("yourTurnText", "color", PLAYERS_ORDER[activePlayer])
+  UI.setAttribute("yourTurnBanner", "visibility", PLAYERS_ORDER[activePlayer])
+end
+
+-- show active player
+function showCurrentDamage()
+  if activePlayer ~= 0 then
+    -- change damage number
+    UI.setAttribute("damageCounter", "text", damageCounter)
+    -- change damage number color
+    if damageCounter == 0 then
+      UI.setAttribute("damageCounter", "color", "#FFFFFF") -- white
+    elseif damageCounter < 10 then
+      UI.setAttribute("damageCounter", "color", "#FF8000") -- orange
+    else
+      UI.setAttribute("damageCounter", "color", "#FF5555") -- red
+    end
+  end
+end
+
+-- find deck in deck zone
+function findDeckInZone(zone)
+  local objects = zone.getObjects()
+  for _, obj in ipairs(objects) do
+    if obj.tag == "Deck" or obj.tag == "Card" then
+      return obj
+    end
+  end
+  return nil
+end
+
+-- change to next player
+function nextTurn()
+  -- safety check: no player with 0 HP or deck with 0 cards
+  if hasPlayerLessHPthan(0) or deckCards <= 0 then
+    -- then stop and don't prepare next turn
+    return
+  end
+
+  lockAllCardsInZone(dropZone)
+  lockAllCardsInZone(discardZone)
+
+  if not reverseTurnOrder then
+    -- clockwise order
+    activePlayer = (activePlayer % #PLAYERS_ORDER) + 1
+  else
+    -- counter-clockwise order
+    activePlayer = ((activePlayer - 2) % #PLAYERS_ORDER) + 1
+  end
+
+  -- switch your turn UI
+  updateTurnUI()
+
+  -- activate skip button for active player if no field damage & no hand cards
+  if(damageCounter == 0 and
+    #Player[PLAYERS_ORDER[activePlayer]].getHandObjects() == 0) then
+    UI.setAttribute("skipButton", "visibility", PLAYERS_ORDER[activePlayer])
+  else
+    UI.setAttribute("skipButton", "visibility", "hidden")
+  end
+
+  -- activate take damage button if field damage > 0
+  if(damageCounter > 0) then
+    UI.setAttribute("takeDamageButton", "visibility", PLAYERS_ORDER[activePlayer])
+  else
+    UI.setAttribute("takeDamageButton", "visibility", "hidden")
+  end
+
+  --clear pressed buttons design
+  UI.setAttribute("skipButton", "color", "#FFFFFF")
+  UI.setAttribute("takeDamageButton", "color", "#FFFFFF")
+  UI.setAttribute("newGameButton", "color", "#FFFFFF")
+  UI.setAttribute("newGameButtonTeam", "color", "#FFFFFF")
+
+  -- if next player is not-seated: use bot
+  if botMode and (Player[PLAYERS_ORDER[activePlayer]].seated == false) then
+    UI.setAttribute("botThinkingText", "color", PLAYERS_COLOR_CODE[activePlayer])
+    UI.setAttribute("botThinkingText", "text", "Player " ..
+      PLAYERS_ORDER[activePlayer] .. "(NPC) is thinking...")
+    UI.setAttribute("botThinkingPanel", "visibility", "")
+
+    Wait.time(function()
+        UI.setAttribute("botThinkingPanel", "visibility", "hidden")
+        botTurn()
+      end, botThinkingTime)
+    return
+  end
+end
+
+function returnCardToHand(playerColor, card)
+    -- get the position of the hand of the player
+    local handPos = Player[playerColor].getHandTransform(1).position
+
+    -- raise the position a bit so it doesn't stick in the table
+    handPos.y = handPos.y + 2
+
+    -- optional: wait a bit to give the card back on hand so transition is more smooth
+    Wait.time(function()
+        card.setPositionSmooth(handPos, false, true)
+    end, 0.1)
+end
+
+-- check if card is in zone (faster than containsObject)
+function isCardInZone(card, zone)
+  local zonePos = zone.getPosition()
+  local cardPos = card.getPosition()
+
+  local dx = math.abs(zonePos.x - cardPos.x)
+  local dz = math.abs(zonePos.z - cardPos.z)
+
+  return dx < 5 and dz < 5
+end
+
+function isFromAnotherHandZone(playerColor, object)
+  local objPos = object.getPosition()
+
+  for _, color in ipairs(Player.getAvailableColors()) do
+    if color ~= playerColor then
+      local hand = Player[color].getHandTransform(1)
+      local handPos = hand.position
+      local scale = hand.scale or {x = 4, y = 0, z = 2}
+
+      local dx = math.abs(objPos.x - handPos.x)
+      local dz = math.abs(objPos.z - handPos.z)
+
+      if dx < scale.x and dz < scale.z then
+        return true, color
+      end
+    end
+  end
+
+  return false, nil
+end
+
+-- lock all cards in specific zone so they can't get moved
+function lockAllCardsInZone(zone)
+  local objects = zone.getObjects()
+  for _, obj in ipairs(objects) do
+    if obj.tag == "Card" then
+      obj.interactable = false
+    end
+  end
+end
+
+-- check all the time the ending conditions
+function reachedGameEnd()
+  -- someones HP are 0
+  for _, hp in ipairs(playersHP) do
+    if hp <= 0 then
+      return true
+    end
+  end
+  -- no cards left in deck
+  if deckCards <= 0 then
+    return true
+  end
+  return false
+end
+
+function endGame()
+  printToAll("End of Game!")
+  UI.setAttribute("skipButton", "visibility", "hidden")
+  UI.setAttribute("takeDamageButton", "visibility", "hidden")
+  UI.setAttribute("yourTurnBanner", "visibility", "hidden")
+
+  -- delay calculation a bit, because maybe cards are still dealt
+  Wait.time(function()
+    if teamMode then
+      calculateTeamPoints()
+    else
+      calculatePoints()
+    end
+  end, 1)
+end
+
+-- calculate points and show result
+function calculatePoints()
+  printToAll("Calculate points...!")
+
+  finalPlayerPoints = {}
+
+  --  calculate points
+  for i, color in ipairs(PLAYERS_ORDER) do
+    local handObjs = Player[color].getHandObjects()
+    -- result = hp + cards
+    result[i] = playersHP[i] + #handObjs
+    table.insert(finalPlayerPoints, {color = color, points = result[i]})
+  end
+
+  -- sort player with points
+  local finalRanking = getSortedColorsByPointsWithTieBreaker(finalPlayerPoints)
+
+  -- get max values and indices of players
+  local maxVal, winnerIndices = getMaxIndices(result)
+
+  -- display ranking
+  for i, color in ipairs(finalRanking) do
+    local found, originalIndex = containsWithIndex(PLAYERS_ORDER, color)
+    if found then
+      -- set color of rank
+      UI.setAttribute("result"..i, "color", PLAYERS_COLOR_CODE[originalIndex])
+      -- set text to rank
+      UI.setAttribute("result"..i, "text", i .. ". " ..
+      "Player " .. color .. ": " ..
+      result[originalIndex] .. " Points (" ..
+      playersHP[originalIndex] .. " HP + " ..
+      #Player[color].getHandObjects() .. " Cards)")
+    end
+  end
+
+  -- display final winner
+  if #winnerIndices == 1 then
+    UI.setAttribute("resultWinner", "text", "The winner is player " ..
+      finalRanking[1] .. "!")
+    print("The winner is player " ..
+      finalRanking[1] .. "!")
+  else
+    UI.setAttribute("resultWinner", "text", "The winner is player " ..
+      finalRanking[1] .. "! \n(by next turn order)")
+    print("The winner is player " ..
+      finalRanking[1] .. "! \n(by next turn order)")
+  end
+  UI.setAttribute("resultPanel", "visibility", "")
+
+  -- set new game button under result panel
+  UI.setAttribute("newGameButton", "visibility", "")
+end
+
+-- calculate points and show result
+function calculateTeamPoints()
+  printToAll("Calculate points...!")
+
+  local countOrange = 0
+  local countTeal = 0
+  -- show hp and hand card count for each player, count team points
+  for i, color in ipairs(PLAYERS_ORDER) do
+    if i%2 == 0 then
+      -- if team orange (red=2 or yellow=4)
+      countOrange = countOrange + playersHP[i] + #Player[color].getHandObjects()
+    else
+      -- if team teal (blue=1 or green=2)
+      countTeal = countTeal + playersHP[i] + #Player[color].getHandObjects()
+    end
+  end
+  -- show result
+  if countOrange > countTeal then
+    -- team orange won
+    printToAll("Team Orange is the Winner!")
+    UI.setAttribute("resultTeamFight", "color", "#FFa500")
+    UI.setAttribute("resultTeamFight", "text", "Team Orange is the Winner!")
+  elseif countTeal > countOrange then
+    -- team teal won
+    printToAll("Team Teal is the Winner!")
+    UI.setAttribute("resultTeamFight", "color", "#009193")
+    UI.setAttribute("resultTeamFight", "text", "Team Teal is the Winner!")
+  else
+    -- equal amount of points → draw
+    printToAll("Draw between Team Teal and Team Orange!")
+    UI.setAttribute("resultTeamFight", "color", "#FFFFFF")
+    UI.setAttribute("resultTeamFight", "text", "DRAW!!!")
+  end
+  -- make result panel and new game button visible
+  UI.setAttribute("resultPanelTeam", "visibility", "")
+  UI.setAttribute("newGameButtonTeam", "visibility", "")
+end
+
+-- get sorted list of players by points and tie rule
+function getSortedColorsByPointsWithTieBreaker(sortableList)
+  -- input table: {colorA:pointsA, colorB:pointsB, ...}
+
+  -- 1. sort by points descending
+  table.sort(sortableList, function(a, b)
+    return a.points > b.points
+  end)
+
+  -- 2. check tie break
+  local highestPoints = sortableList[1].points
+  local tiedColors = {}
+
+  for _, entry in ipairs(sortableList) do
+    if entry.points == highestPoints then
+      table.insert(tiedColors, entry.color)
+    else
+      break
+    end
+  end
+
+  -- 3. if tie break → next turn order decides winner
+  if #tiedColors > 1 then
+    local totalPlayers = #PLAYERS_ORDER
+    local searchOrder = {}
+
+    for i = 1, totalPlayers do
+      local index = ((activePlayer + i - 1) % totalPlayers) + 1
+      table.insert(searchOrder, PLAYERS_ORDER[index])
+    end
+
+    -- find in tiedColors the one who would be next in order
+    local winnerColor = nil
+    for _, turnColor in ipairs(searchOrder) do
+      for _, tiedColor in ipairs(tiedColors) do
+        if tiedColor == turnColor then
+          winnerColor = tiedColor
+          break
+        end
+      end
+      if winnerColor then break end
+    end
+
+    -- 4. put new winner on first place and create new list
+    local reorderedList = {winnerColor}
+    for _, entry in ipairs(sortableList) do
+      if entry.color ~= winnerColor then
+        table.insert(reorderedList, entry.color)
+      end
+    end
+    return reorderedList
+  else
+
+    -- no tie, simply output list
+    local finalOrder = {}
+    for _, entry in ipairs(sortableList) do
+      table.insert(finalOrder, entry.color)
+    end
+    return finalOrder
+  end
+end
+
+-- start game with complete set up
+function startGame()
+  -- hide start button
+  UI.hide("startUI")
+
+  -- set players HP
+  for i = 1, #playersHP do playersHP[i] = playerStartHP end
+
+  -- look for deck in deck zone
+  deckZone = getObjectFromGUID(DECK_ZONE_GUID)
+  deck = findDeckInZone(deckZone)
+  if deck == nil then
+    broadcastToAll("No deck in the deck zone!", {1, 0, 0})
+    return
+  end
+  deck.interactable = false
+
+  -- shuffle deck
+  deck.shuffle()
+
+  -- deal 5 cards to each player
+  for _, color in ipairs(PLAYERS_ORDER) do
+    deck.deal(startDeal, color)
+  end
+
+  -- decide starting playersHP
+  activePlayer = math.random(1, #PLAYERS_ORDER)
+
+  -- switch your turn UI
+  updateTurnUI()
+
+  -- show right turn direction
+  updateTurnOrderImage()
+  UI.setAttribute("turnOrderImage", "visibility", "")
+
+  -- start winning condition
+  Wait.condition(endGame, reachedGameEnd)
+
+  -- if starting player is not-seated and bot mode on
+  if botMode and (Player[PLAYERS_ORDER[activePlayer]].seated == false) then
+    printToAll("Player " .. PLAYERS_ORDER[activePlayer] .. "(NPC) starts the game!")
+    UI.setAttribute("botThinkingText", "color", PLAYERS_COLOR_CODE[activePlayer])
+    UI.setAttribute("botThinkingText", "text", "Player " ..
+      PLAYERS_ORDER[activePlayer] .. "(NPC) is thinking...")
+    UI.setAttribute("botThinkingPanel", "visibility", "")
+
+    Wait.time(function()
+        UI.setAttribute("botThinkingPanel", "visibility", "hidden")
+        botTurn()
+      end, botThinkingTime)
+    return
+  end
+
+  printToAll("Player " .. PLAYERS_ORDER[activePlayer] .. " starts the game!")
+end
+
+-- new game by button press
+function setupGame()
+  printToAll("Setup Game...", {1, 1, 1})
+
+  -- reset game variables
+  result = {0, 0, 0, 0}
+  activePlayer = 0
+  damageCounter = 0
+  reverseTurnOrder = false
+  cardsInDropZone = 0
+  topCard = ""
+
+  -- reset deck
+  local spawnPos = deckZone.getPosition()
+  spawnPos.y = 3.0
+
+  -- destruct all cards
+  for _, obj in ipairs(getAllObjects()) do
+    if obj.tag == "Card" or obj.tag == "Deck" then
+      obj.destruct()
+    end
+  end
+
+  -- spawn deck from json save
+  local spawnPos = deckZone.getPosition()
+  spawnPos.y = 3.0
+
+  spawnObjectJSON({
+    json = originalDeckJson,
+    position = spawnPos,
+    rotation = {180, 0, 0},
+    callback_function = function(deck)
+      local finalPos = deckZone.getPosition()
+      finalPos.y = 2.04
+      deck.setPositionSmooth(finalPos)
+      deck.setRotationSmooth({180, 0, 0})
+    end
+  })
+
+  UI.setAttribute("newGameButton", "visibility", "hidden")
+  UI.setAttribute("newGameButtonTeam", "visibility", "hidden")
+  UI.setAttribute("resultPanel", "visibility", "hidden")
+  UI.setAttribute("resultPanelTeam", "visibility", "hidden")
+
+  -- start game with a bit delay because of deck spawn
+  Wait.time(function()
+      startGame()
+    end, 0.5)
+end
+
+-- check all conditions to play a card
+function canBePlayed(droppedObject)
+  local card = droppedObject.getName()
+
+  -- can always play if empty drop zone or special card
+  if contains(SPECIAL_CARDS, card) or cardsInDropZone == 0 then
+    return true
+  end
+
+  --check element conditions
+  -- if top card: fire --> fire or water
+  if contains(FIRE_CARDS, topCard) and (contains(FIRE_CARDS, card) or contains(WATER_CARDS, card)) then
+      return true
+  end
+  -- if top card: water --> water or earth
+  if contains(WATER_CARDS, topCard) and (contains(WATER_CARDS, card) or contains(EARTH_CARDS, card)) then
+      return true
+  end
+  -- if top card: earth --> earth or wind
+  if contains(EARTH_CARDS, topCard) and (contains(EARTH_CARDS, card) or contains(WIND_CARDS, card)) then
+      return true
+  end
+  -- if top card: wind --> wind or fire
+  if contains(WIND_CARDS, topCard) and (contains(WIND_CARDS, card) or contains(FIRE_CARDS, card)) then
+      return true
+  end
+
+  -- if no matches found
+  return false
+end
+
+-- activate the effect of played card
+function activateCardEffect(droppedObject)
+  local card = droppedObject.getName()
+
+  -- normal element attack card: damage + 2
+  if card == FIRE_CARDS[1] or
+     card == WATER_CARDS[1] or
+     card == WIND_CARDS[1] or
+     card == EARTH_CARDS[1] then
+    damageCounter = damageCounter + 2
+    printToAll(PLAYERS_ORDER[activePlayer] .. " played: \""
+      .. droppedObject.getName() .. "\"" ..
+      "(+2 Damage)")
+      -- next turn can begin
+      nextTurn()
+    return
+  end
+
+  -- card "Forte": double damage, +2 damage when empty field
+  if card == FIRE_CARDS[2] then
+    if damageCounter ~= 0 then
+      damageCounter = damageCounter * 2
+      printToAll(PLAYERS_ORDER[activePlayer] .. " played: \""
+        .. droppedObject.getName() .. "\"" ..
+        "(Doubles Damage)")
+    else
+      damageCounter = 2
+      printToAll(PLAYERS_ORDER[activePlayer] .. " played: \""
+        .. droppedObject.getName() .. "\"" ..
+        "(+2 Damage b/c empty field)")
+    end
+    -- next turn can begin
+    nextTurn()
+    return
+  end
+
+  -- card "Tear": heal 2, but take damage, clear field
+  if card == WATER_CARDS[2] then
+    playersHP[activePlayer] = playersHP[activePlayer] + 2
+    local damageValue = damageCounter -- save for print
+    -- a bit delay because "Tear" need to be layed down before damage
+    Wait.time(function()
+      takeDamage()
+      -- wait until all cards are on hand
+      Wait.time(function()
+        -- next turn can begin after a bit of delay
+        nextTurn()
+      end, 1.0)
+    end, 0.5)
+    printToAll(PLAYERS_ORDER[activePlayer] .. " played: \""
+      .. droppedObject.getName() .. "\"" ..
+      "(healed 2 and got " .. damageValue .. " Damage)")
+    return
+  end
+
+  -- card "Refreshing Veil ": reverse turn order, take no damage
+  if card == WIND_CARDS[2] then
+    if reverseTurnOrder == false then
+      reverseTurnOrder = true
+    else
+      reverseTurnOrder = false
+    end
+    updateTurnOrderImage()
+    printToAll(PLAYERS_ORDER[activePlayer] .. " played: \""
+      .. droppedObject.getName() .. "\"" ..
+      "(reversed turn order)")
+    -- next turn can begin
+    nextTurn()
+    return
+  end
+
+  -- card "Earth Guard": halves damage, +2 damage when empty field
+  if card == EARTH_CARDS[2] then
+    if damageCounter ~= 0 then
+      damageCounter = damageCounter / 2
+      local damageValue = damageCounter -- save for print
+      -- a bit delay because "Earth Guard" need to be layed down before damage
+      Wait.time(function()
+        takeDamage()
+        -- wait until all cards are on hand
+        Wait.time(function()
+          nextTurn()
+        end, 1.0)
+      end, 0.5)
+      printToAll(PLAYERS_ORDER[activePlayer] .. " played: \""
+        .. droppedObject.getName() .. "\"" ..
+        "(got " .. damageValue .. " Damage)")
+      return
+    else
+      damageCounter = 2
+      printToAll(PLAYERS_ORDER[activePlayer] .. " played: \""
+        .. droppedObject.getName() .. "\"" ..
+        "(+2 Damage b/c empty field)")
+      -- next turn can begin
+      nextTurn()
+      return
+    end
+  end
+
+  -- card "Chrono Drive": negates damage, draw 2 cards
+  if card == SPECIAL_CARDS[1] then
+      damageCounter = 0
+      if deckCards >= 2 then
+        deck.deal(2, PLAYERS_ORDER[activePlayer], 1)
+      else
+        giveLastCardToPlayer(PLAYERS_ORDER[activePlayer])
+      end
+      Wait.time(function()
+        clearDropZone()
+        nextTurn()
+      end, 0.5)
+      printToAll(PLAYERS_ORDER[activePlayer] .. " played: \""
+        .. droppedObject.getName() .. "\"" ..
+        "(no damage, +2 deck cards)")
+    return
+  end
+
+  -- card "Lost Mobius": negates damage, +2 damage for all other players
+  if card == SPECIAL_CARDS[2] then
+      damageCounter = 0
+      -- info: players taking damage without drawing cards
+      for i = 1, #playersHP, 1 do
+        if i ~= activePlayer then
+          if playersHP[i] >= 2 then
+            playersHP[i] = playersHP[i]-2
+          else
+            playersHP[i] = 0
+          end
+        end
+      end
+      Wait.time(function()
+        clearDropZone()
+        nextTurn()
+      end, 0.5)
+      printToAll(PLAYERS_ORDER[activePlayer] .. " played: \""
+        .. droppedObject.getName() .. "\"" ..
+        "(no damage, +2 damage for other players)")
+      -- next turn can begin
+    return
+  end
+
+  -- card "Crescent Eye": negates damage, exchange cards with other player
+  if card == SPECIAL_CARDS[3] then
+    damageCounter = 0
+    Wait.time(function()
+      clearDropZone()
+    end, 0.5)
+    UI.setAttribute("swapChoicePanel", "visibility", PLAYERS_ORDER[activePlayer])
+    -- bot thinks about hand swap decision
+    if botMode and Player[PLAYERS_ORDER[activePlayer]].seated == false then
+      UI.setAttribute("botThinkingText", "color", PLAYERS_COLOR_CODE[activePlayer])
+      UI.setAttribute("botThinkingText", "text", "Player " ..
+        PLAYERS_ORDER[activePlayer] .. "(NPC) is thinking...")
+      UI.setAttribute("botThinkingPanel", "visibility", "")
+      Wait.time(function()
+        UI.setAttribute("botThinkingPanel", "visibility", "hidden")
+        botDecidesHandSwap()
+      end, 2)
+    end
+    return
+  end
+
+  printToAll("error: effect of card \"" .. card .."\" not implemented!", {1, 0, 0})
+end
+
+-- click event by player
+function clickTakeDamage()
+  printToAll("Player " .. PLAYERS_ORDER[activePlayer] ..
+    " takes " .. damageCounter .. " damage.")
+  takeDamage()
+end
+
+-- take damage, draw equal number or cards if HP not zero
+function takeDamage()
+  -- only set HP to zero if damage higher than left hp (no cards drawn)
+  if damageCounter >= playersHP[activePlayer] then
+    playersHP[activePlayer] = 0
+  -- if player survives damage but only 1 card left in deck
+  elseif playersHP[activePlayer] >= damageCounter and deckCards == 1 then
+    giveLastCardToPlayer(PLAYERS_ORDER[activePlayer])
+  -- any other case the player survives damage and there is still a deck
+  else
+    playersHP[activePlayer] = playersHP[activePlayer] - damageCounter
+    deck.deal(damageCounter, PLAYERS_ORDER[activePlayer], 1)
+  end
+  damageCounter = 0
+  UI.setAttribute("takeDamageButton", "visibility", "hidden")
+  clearDropZone()
+end
+
+function clearDropZone()
+  -- get target position from discard zone
+  local discardPos = discardZone.getPosition()
+  discardPos.y = discardPos.y + 2
+
+  -- collect cards from drop zone
+  local cardsToMove = {}
+  for _, obj in ipairs(dropZone.getObjects()) do
+    if obj.tag == "Card" then
+      table.insert(cardsToMove, obj)
+    end
+  end
+
+  if #cardsToMove == 0 then
+    return
+  end
+
+  -- with delay, so they build new deck
+  Wait.time(function()
+    for _, obj in ipairs(cardsToMove) do
+      obj.setPosition(discardPos)
+    end
+  end, 0.25)
+
+  cardsInDropZone = 0
+end
+
+function swapWithPlayer(player, value, id)
+  local targetColor = string.gsub(id, "swapWith", "")
+  if targetColor == PLAYERS_ORDER[activePlayer] then
+    printToColor("You can't exchange hands with yourself!", player.color, {1, 0, 0})
+    return
+  end
+
+  swapHands(PLAYERS_ORDER[activePlayer], targetColor)
+  UI.setAttribute("swapChoicePanel", "visibility", "hidden")
+
+  printToAll(PLAYERS_ORDER[activePlayer] .. " played: \"Crescent Eye\"" ..
+    "(no damage, hand swap with " .. targetColor ..")")
+
+  -- next turn can begin after cards were exchanged, wait short timer
+  Wait.time(function()
+    nextTurn()
+  end, 1)
+end
+
+-- swap cards on hands of two player same time with coroutine
+function swapHands(colorA, colorB)
+  function passCardsCoroutine()
+    -- make table with players for loop
+    players = {colorA, colorB}
+
+    -- loop over player who swap hands with each other
+    for index, color in ipairs(players) do
+      -- get other player as target
+      local target = nil
+      target = players[(index % #players) + 1]
+
+      -- get card objects and transfer
+      local playerHand = Player[color].getHandObjects()
+      for _, item in ipairs(playerHand) do
+        if item.tag == 'Card' then
+          item.deal(1, target)
+        end
+      end
+      coroutine.yield(0)
+    end
+    passInProgress = false
+    return 1
+  end
+  startLuaCoroutine(self, 'passCardsCoroutine')
+end
+
+-- get hand cards and card names
+function getPlayerHandInfo(playerColor)
+  local handCards = Player[playerColor].getHandObjects(1)
+  local cardNames = {}
+
+  for _, card in ipairs(handCards) do
+    table.insert(cardNames, card.getName())
+  end
+
+  return handCards, cardNames
+end
+
+-- get table back with only playable cards
+function filterPlayableCards(cards)
+  local resultCardObjects = {}
+  local resultCardNames = {}
+
+  for _, card in ipairs(cards) do
+    if canBePlayed(card) then
+      table.insert(resultCardObjects, card)
+      table.insert(resultCardNames, card.getName())
+    end
+  end
+  return resultCardObjects, resultCardNames
+end
+
+-- spilt cards in hand in normal and special element cards
+function splitCardsNormalSpecial(playableCardObjects, playableCardNames)
+  local normalCards = {}
+  local normalCardsNames = {}
+  local specialCards = {}
+  local specialCardsNames = {}
+
+  for i, name in ipairs(playableCardNames) do
+    local card = playableCardObjects[i]
+    if contains(SPECIAL_CARDS, name) then
+      table.insert(specialCards, card)
+      table.insert(specialCardsNames, card.getName())
+    else
+      table.insert(normalCards, card)
+      table.insert(normalCardsNames, card.getName())
+    end
+  end
+
+  return normalCards, normalCardsNames, specialCards, specialCardsNames
+end
+
+-- card to play from hand
+function playCardToDropZone(cardObject)
+  -- count cards in drop zone for drop height
+  local stackCount = 0
+  for _, obj in ipairs(dropZone.getObjects()) do
+    if obj.tag == "Card" then
+      stackCount = stackCount + 1
+    end
+  end
+
+  -- move card a bit higher
+  local centerPos = dropZone.getPosition()
+  centerPos.y = centerPos.y + stackCount*0.2
+
+  -- small random rotation around y axis
+  local randomYRotation = math.random(-5, 5)
+  local cardRotation = cardObject.getRotation()
+  local finalRotation = {x = cardRotation.x,
+    y = cardRotation.y + randomYRotation, z = cardRotation.z}
+
+  -- move card a little delayed to center of table
+  cardObject.setPositionSmooth(centerPos, false, true)
+  cardObject.setRotationSmooth(finalRotation, false, true)
+  cardObject.interactable = false
+
+  cardsInDropZone = cardsInDropZone+1
+  topCard = cardObject.getName()
+
+  -- play card with all its effects
+  activateCardEffect(cardObject)
+end
+
+-- function when deck has only one card left and deck.deal() can't be used
+function giveLastCardToPlayer(playerColor)
+  -- get last card
+  local objects = deckZone.getObjects()
+  local lastCard = nil
+
+  for _, obj in ipairs(objects) do
+    if obj.tag == "Card" then
+      lastCard = obj
+      break
+    end
+  end
+
+  -- Handposition des Spielers holen
+  local handPos = Player[playerColor].getHandTransform(1).position
+  handPos.y = handPos.y + 2  -- etwas über der Hand platzieren
+
+  -- Karte bewegen
+  lastCard.setPositionSmooth(handPos)
+  lastCard.setRotationSmooth({180, 0, 0})
+end
+
+-- finds player with most hand cards which are not own hand
+function findPlayerWithMostCards()
+  local mostCards = -1
+  local targetColor = nil
+
+  for i, color in ipairs(PLAYERS_ORDER) do
+    -- if normal not team mode ‭→ don't choose own hand
+    if teamMode == false then
+      if color ~= PLAYERS_ORDER[activePlayer] then
+        local hand = Player[color].getHandObjects(1)
+        local count = #hand
+        if count > mostCards then
+          mostCards = count
+          targetColor = color
+        end
+      end
+    -- if team mode ‭→ don't choose own hand, don't choose teammate hand
+    else
+      -- get index of teammate
+      local teamMateIndex = ((activePlayer + 1) % 4) + 1
+      if color ~= PLAYERS_ORDER[activePlayer] and
+        color ~= PLAYERS_ORDER[teamMateIndex] then
+        local hand = Player[color].getHandObjects(1)
+        local count = #hand
+        if count > mostCards then
+          mostCards = count
+          targetColor = color
+        end
+      end
+    end
+  end
+
+  return targetColor, mostCards
+end
+
+-- has one player less than x HP
+function hasPlayerLessHPthan(x)
+  for _, value in ipairs(playersHP) do
+    if value <= x then
+      return true
+    end
+  end
+  return false
+end
+
+-- bot turn if the active player is not seated
+function botTurn()
+  -- safety check: bot mode on, not unseated, no end condition
+  if botMode == false or
+    Player[PLAYERS_ORDER[activePlayer]].seated == true or
+    contains(playersHP, 0) then
+    return
+  end
+
+  -- get cards from hand
+  local handCards, cardNames = getPlayerHandInfo(PLAYERS_ORDER[activePlayer])
+
+  -- case: empty hand, no damage on field → skip turn
+  if #handCards == 0 and damageCounter == 0 then
+    nextTurn()
+    return
+  end
+
+  -- case: empty hand, but damage on field → take damage, continue if not dead
+  if #handCards == 0 and damageCounter > 0 then
+    printToAll("Player " .. PLAYERS_ORDER[activePlayer] ..
+      " takes " .. damageCounter .. " damage.")
+    takeDamage()
+    -- is dead after damage → stop doing something
+    if playersHP == 0 then
+      return
+    -- has hand cards from damage → delay and play them
+    else
+      UI.setAttribute("botThinkingText", "color", PLAYERS_COLOR_CODE[activePlayer])
+      UI.setAttribute("botThinkingText", "text", "Player " ..
+        PLAYERS_ORDER[activePlayer] .. "(NPC) is thinking...")
+      UI.setAttribute("botThinkingPanel", "visibility", "")
+      Wait.time(function()
+        UI.setAttribute("botThinkingPanel", "visibility", "hidden")
+        botPlaysCards()
+      end, botThinkingTime/2)
+      return
+    end
+  end
+
+  -- case: have hand cards and wants to play one
+  botPlaysCards()
+end
+
+-- bot has cards and wants to play them
+function botPlaysCards()
+  -- still check if function called when bot mode on and not unseated
+  if botMode == false or
+  Player[PLAYERS_ORDER[activePlayer]].seated == true or
+    contains(playersHP, 0) then
+    return
+  end
+
+  -- get cards from hand
+  local handCards, cardNames = getPlayerHandInfo(PLAYERS_ORDER[activePlayer])
+
+  -- filter cards in hand that are playable
+  local playableCardObjects, playableCardNames = filterPlayableCards(handCards)
+
+  -- seperate into four tables (card objects, names) of normal and special cards
+  local normalCards, normalCardsNames, specialCards, specialCardsNames =
+    splitCardsNormalSpecial(playableCardObjects, playableCardNames)
+
+  --[[ Bot Strategy:
+  -- play normal element cards first (simply first in normalCards table)
+    -- prefer "Tear" if field damage <= 4 (and HP > 2)
+    -- prefer "Earth Guard" if field damage <= 4 (and HP > 2)
+    -- prefer "Earth Guard" over "Tear" if field damage > HP + 2
+    -- prefer "Fire Bolt" over "Forte" when field damage low
+    -- prefer special card over "Tear" or "Earth Guard" when high field damage
+  -- keep special cards until there is no normal element card to play
+    -- exception: prefer "Lost Mobius" if one other player has only 2 HP left
+    -- when playing "Crescent Eye", choose player with most cards on hand
+      -- exception in team mode: don't choose hand of teammate
+  ]]
+
+  -- case: prefer "Lost Mobius" if one other player has only 2 HP left
+  local hasLostMobius, indexLostMobius =
+      containsWithIndex(specialCardsNames, "Lost Mobius")
+  if hasLostMobius and hasPlayerLessHPthan(2) then
+    playCardToDropZone(specialCards[indexLostMobius])
+    return
+  end
+
+  -- case: play normal element card
+  if #normalCards > 0 then
+
+    -- prefer "Tear" if field damage <= 4 (and HP > 2)
+    local hasTear, indexTear = containsWithIndex(normalCardsNames, "Tear")
+    if hasTear and damageCounter <= 4 and playersHP[activePlayer] > 2 then
+      playCardToDropZone(normalCards[indexTear])
+      return
+    end
+
+    -- prefer "Earth Guard" if field damage <= 4 (and HP > 2)
+    local hasEarthBreaker, indexBreaker =
+      containsWithIndex(normalCardsNames, "Earth Guard")
+    if hasEarthBreaker and damageCounter <= 4
+      and playersHP[activePlayer] > 2 then
+      playCardToDropZone(normalCards[indexBreaker])
+      return
+    end
+
+    -- prefer "Earth Guard" over "Tear" if field damage > HP + 2
+    if not contains(normalCardsNames, "Earth Breaker") and
+      not contains(normalCardsNames, "Hydro Cannon") and
+      contains(normalCardsNames, "Earth Guard") and
+      contains(normalCardsNames, "Tear") and
+      #specialCards == 0 and
+      damageCounter >= (playersHP[acitvePlayer] + 2) then
+        local hasEarthBreaker, indexBreaker =
+          containsWithIndex(normalCardsNames, "Earth Guard")
+        playCardToDropZone(normalCards[indexBreaker])
+      end
+
+
+    -- prefer "Fire Bolt" over "Forte" when field damage low
+    if contains(normalCardsNames, "Fire Bolt") and
+      contains(normalCardsNames, "Forte") and damageCounter < 2 then
+        local hasFireBolt, indexFireBolt =
+          containsWithIndex(normalCardsNames, "Fire Bolt")
+          playCardToDropZone(normalCards[indexFireBolt])
+      return
+    end
+
+    -- prefer special card over "Tear" when high field damage
+    if damageCounter >= (playersHP[activePlayer]+2) and
+      not contains(normalCardsNames, "Hydro Cannon") and
+      contains(normalCardsNames, "Tear") and
+      #specialCards > 0 then
+      playCardToDropZone(specialCards[math.random(#specialCards)])
+      return
+    end
+
+    -- prefer special card over "Earth Guard" when high field damage
+    if (damageCounter/2) >= playersHP[activePlayer] and
+      not contains(normalCardsNames, "Earth Breaker") and
+      contains(normalCardsNames, "Earth Guard") and
+      #specialCards > 0 then
+      playCardToDropZone(specialCards[math.random(#specialCards)])
+      return
+    end
+
+    -- else: prefer any other card which is not "Tear" or "Earth Guard"
+    for i, card in ipairs(normalCardsNames) do
+      if card ~= "Tear" or card ~= "Earth Guard" then
+        playCardToDropZone(normalCards[i])
+        return
+      end
+    end
+
+    -- if no strategy hit, play random normal card
+    playCardToDropZone(normalCards[math.random(#normalCards)])
+    return
+  end
+
+  -- case: play special element card
+  if #specialCards > 0 then
+      playCardToDropZone(specialCards[1])
+    return
+  end
+
+  -- case: no playable cards, but damage on field
+  -- damage is higher than players HP → end of game
+  if damageCounter >= playersHP[activePlayer] then
+    printToAll("Player " .. PLAYERS_ORDER[activePlayer] ..
+      " takes " .. damageCounter .. " damage.")
+    takeDamage()
+    return
+  -- player survives damage and gets new cards to play  → restart after delay
+  elseif damageCounter > 0 then
+    printToAll("Player " .. PLAYERS_ORDER[activePlayer] ..
+      " takes " .. damageCounter .. " damage.")
+    takeDamage()
+    UI.setAttribute("botThinkingText", "color", PLAYERS_COLOR_CODE[activePlayer])
+    UI.setAttribute("botThinkingText", "text", "Player " ..
+      PLAYERS_ORDER[activePlayer] .. "(NPC) is thinking...")
+    UI.setAttribute("botThinkingPanel", "visibility", "")
+
+    Wait.time(function()
+        UI.setAttribute("botThinkingPanel", "visibility", "hidden")
+        botPlaysCards()
+      end, botThinkingTime)
+    return
+  -- player has no playable cards and field damage is zero, rare situation
+  -- (e.g. it was zero field damage and "Refreshing Veil" was played before)
+  else
+    nextTurn()
+  end
+end
+
+-- bot has decide a hand swap after playing card "Crescent Eye"
+function botDecidesHandSwap()
+  -- still check if function called when bot mode on and not unseated
+  if botMode == false or
+    Player[PLAYERS_ORDER[activePlayer]].seated == true or
+    contains(playersHP, 0) then
+    return
+  end
+
+  -- choose player with most cards on hand, which is not own one
+  local targetColor, mostCards = findPlayerWithMostCards()
+
+  swapHands(PLAYERS_ORDER[activePlayer], targetColor)
+  UI.setAttribute("swapChoicePanel", "visibility", "hidden")
+
+  printToAll(PLAYERS_ORDER[activePlayer] .. " played: \"Crescent Eye\"" ..
+    "(no damage, hand swap with " .. targetColor ..")")
+  -- next turn can begin after cards were exchanged, wait short timer
+  Wait.time(function()
+    nextTurn()
+  end, 1)
+end
+
+-- helper function: is element in table
+function contains(tbl, value)
+  for _, v in ipairs(tbl) do
+    if v == value then
+      return true
+    end
+  end
+  return false
+end
+
+-- helper function: is element in table with index
+function containsWithIndex(tbl, value)
+  for i, v in ipairs(tbl) do
+    if tbl[i] == value then
+      return true, i
+    end
+  end
+  return false, -1
+end
+
+-- helper function: get indices of highest values in table
+function getMaxIndices(tbl)
+  local maxVal = -math.huge
+  local indices = {}
+
+  for i, v in ipairs(tbl) do
+    if v > maxVal then
+      maxVal = v
+      indices = {i}
+    elseif v == maxVal then
+      table.insert(indices, i)
+    end
+  end
+  return maxVal, indices
+end
+
+-- helper-function: dump table content to string
+function dump(o)
+   if type(o) == 'table' then
+      local s = '{ '
+      for k,v in pairs(o) do
+         if type(k) ~= 'number' then k = '"'..k..'"' end
+         s = s .. '['..k..'] = ' .. dump(v) .. ','
+      end
+      return s .. '} '
+   else
+      return tostring(o)
+   end
+end
+
+--[[ functions triggered by event handlers]]
+function onObjectDropped(playerColor, droppedObject)
+  if droppedObject.tag ~= "Card" then return end
+  if playerColor ~= PLAYERS_ORDER[activePlayer] then return end
+
+  -- check if card was put in drop zone
+  if not isCardInZone(droppedObject, dropZone) then
+    printToColor("Drop the card in the middle of the table!", playerColor, {1, 0.5, 0})
+    returnCardToHand(playerColor, droppedObject)
+    return
+  end
+
+  -- check if it is legal to play the card
+  if not canBePlayed(droppedObject) then
+    printToColor("You can't play this card!", playerColor, {1, 0.5, 0})
+    returnCardToHand(playerColor, droppedObject)
+    return
+  end
+
+  -- move card to drop zone and play effect
+  playCardToDropZone(droppedObject)
+end
+
+function onObjectPickedUp(playerColor, object)
+  if object.tag ~= "Card" then return end
+
+  -- only allow cards to move from own hand
+  local wasFromOtherHand, originalOwner = isFromAnotherHandZone(playerColor, object)
+  if wasFromOtherHand then
+    printToColor("You are not allowed to take the cards of player " .. originalOwner .. "!", playerColor, {1, 0, 0})
+    returnCardToHand(originalOwner, object)
+    return
+  end
+
+  -- is it the active player?
+  if playerColor ~= PLAYERS_ORDER[activePlayer] then
+    printToColor("It's not your turn!", playerColor, {1, 0, 0})
+    returnCardToHand(playerColor, object)
+    return
+  end
+end
+
+-- don't let cards merge to deck in drop zone or discard zone
+function tryObjectEnterContainer(container, obj)
+  local inNoMergeZone = false
+  for _, zone in ipairs(obj.getZones()) do
+    if zone == dropZone or zone == discardZone then
+      inNoMergeZone = true
+      break
+    end
+  end
+
+  if inNoMergeZone and obj.tag == "Card" then
+    return false
+  end
+  return true
+end
+
+-- is activated every frame
+function onUpdate()
+    -- nothing to do here now
+end

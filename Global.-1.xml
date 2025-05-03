@@ -1,0 +1,381 @@
+<Canvas raycastTarget="false">
+
+  <!-- Start Button -->
+  <Panel id="startUI"
+    width="300" height="100"
+    position="0 100"
+    rectAlignment="MiddleCenter"
+    allowDragging="false"
+    raycastTarget="false">
+    <Button id="startButton"
+      onClick="startGame"
+      onMouseEnter="onStartGameHover"
+      onMouseExit="onStartGameUnhover"
+      text="Start Game"
+      fontSize="30"
+      width="250" height="60" />
+  </Panel>
+
+  <Panel id="yourTurnBanner"
+    width="400" height="60"
+    anchorMin="0.5 1" anchorMax="0.5 1"
+    position="0 -150"
+    rectAlignment="UpperCenter"
+    visibility="hidden"
+    color="#000000CC"
+    allowDragging="false">
+
+    <Text id="yourTurnText"
+      text="Your Turn"
+      fontSize="36"
+      color="#FFFFFF"
+      alignment="MiddleCenter"
+      raycastTarget="false" />
+  </Panel>
+
+  <!-- statistic panel -->
+  <Button id="counterPanel"
+    anchorMin="1 0.5" anchorMax="1 0.5"
+    position="-50 -140"
+    width="300" height="300"
+    rectAlignment="MiddleRight"
+    color="#222222"
+    interactable="false"
+    visibility="">
+
+    <VerticalLayout spacing="5" padding="10 10 10 10" childForceExpandWidth="true">
+
+      <Text id="deckCounter"
+        text="Deck: ?" fontSize="30"
+        color="#FFFFFF" alignment="MiddleCenter"
+        interactable="false" />
+
+      <Text id="blueCounter" text="Blue: ?" fontSize="24" color="#00BFFF" alignment="MiddleLeft" raycastTarget="false" />
+      <Text id="redCounter" text="Red: ?" fontSize="24" color="#FF5555" alignment="MiddleLeft" raycastTarget="false" />
+      <Text id="greenCounter" text="Green: ?" fontSize="24" color="#00FF00" alignment="MiddleLeft" raycastTarget="false" />
+      <Text id="yellowCounter" text="Yellow: ?" fontSize="24" color="#FFFF00" alignment="MiddleLeft" raycastTarget="false" />
+
+    </VerticalLayout>
+  </Button>
+
+  <!-- statistic panel for teams -->
+  <Button id="counterPanelTeam"
+    anchorMin="1 0.5" anchorMax="1 0.5"
+    position="-50 -140"
+    width="300" height="300"
+    rectAlignment="MiddleRight"
+    color="#222222"
+    interactable="false"
+    visibility="hidden">
+
+    <VerticalLayout spacing="5" padding="10 10 10 10" childForceExpandWidth="true">
+      <Text id="deckCounter2"
+        text="Deck: ?" fontSize="30"
+        color="#FFFFFF" alignment="MiddleCenter"
+        interactable="false" />
+
+      <VerticalLayout spacing="5" padding="10 10 10 10" childForceExpandWidth="true">
+        <Text id="teal" text="Team Teal" fontSize="22" color="#009193" alignment="MiddleLeft" raycastTarget="false" />
+        <Image color="#009193" preferredHeight="1" />
+        <Text id="blueCounter2" text="Blue: ?" fontSize="18" color="#00BFFF" alignment="MiddleLeft" raycastTarget="false" />
+        <Text id="greenCounter2" text="Green: ?" fontSize="18" color="#00FF00" alignment="MiddleLeft" raycastTarget="false" />
+      </VerticalLayout>
+
+      <VerticalLayout spacing="5" padding="10 10 10 10" childForceExpandWidth="true">
+        <Text id="orange" text="Team Orange" fontSize="22" color="#FFa500" alignment="MiddleLeft" raycastTarget="false" />
+        <Image color="#FFa500" preferredHeight="1" />
+        <Text id="redCounter2" text="Red: ?" fontSize="18" color="#FF5555" alignment="MiddleLeft" raycastTarget="false" />
+        <Text id="yellowCounter2" text="Yellow: ?" fontSize="18" color="#FFFF00" alignment="MiddleLeft" raycastTarget="false" />
+      </VerticalLayout>
+    </VerticalLayout>
+  </Button>
+
+  <!-- result panel -->
+  <Button id="resultPanel"
+    anchorMin="0.5 0.5" anchorMax="0.5 0.5"
+    position="0 100"
+    width="550" height="400"
+    rectAlignment="MiddleCenter"
+    color="#222222"
+    interactable="false"
+    visibility="hidden">
+
+    <VerticalLayout spacing="5" padding="10 10 10 10" childForceExpandWidth="true">
+
+      <Text id="resultHeader"
+        text="Results" fontSize="30"
+        color="#FFFFFF" alignment="MiddleCenter"
+        interactable="false" />
+
+      <Text id="result1" text="" fontSize="24" color="#FFFFFF" alignment="MiddleCenter" raycastTarget="false" />
+      <Text id="result2" text="" fontSize="24" color="#FFFFFF" alignment="MiddleCenter" raycastTarget="false" />
+      <Text id="result3" text="" fontSize="24" color="#FFFFFF" alignment="MiddleCenter" raycastTarget="false" />
+      <Text id="result4" text="" fontSize="24" color="#FFFFFF" alignment="MiddleCenter" raycastTarget="false" />
+
+      <Text id="resultWinner"
+        text="The Winner is ..." fontSize="30"
+        color="#FFFFFF" alignment="MiddleCenter"
+        interactable="false" />
+
+    </VerticalLayout>
+  </Button>
+
+  <Button id="resultPanelTeam"
+    anchorMin="0.5 0.5" anchorMax="0.5 0.5"
+    position="0 100"
+    width="600" height="200"
+    rectAlignment="MiddleCenter"
+    color="#222222"
+    interactable="false"
+    visibility="hidden">
+
+      <Text id="resultTeamFight"
+        text="" fontSize="40"
+        color="#FFFFFF" alignment="MiddleCenter"
+        interactable="false" />
+  </Button>
+
+  <!-- after game, button for starting new one -->
+  <Button id="newGameButton"
+      anchorMin="0.5 0.5" anchorMax="0.5 0.5"
+      position="0 -150"
+      width="300" height="40"
+      rectAlignment="MiddleCenter"
+      text="New Game"
+      fontSize="22"
+      onClick="setupGame"
+      onMouseEnter="onNewGameHover"
+      onMouseExit="onNewGameUnhover"
+      color="#FFFFFF"
+      textColor="#000000"
+      visibility="hidden"/>
+
+      <!-- after game, button for starting new one -->
+      <Button id="newGameButtonTeam"
+          anchorMin="0.5 0.5" anchorMax="0.5 0.5"
+          position="0 -50"
+          width="300" height="40"
+          rectAlignment="MiddleCenter"
+          text="New Game"
+          fontSize="22"
+          onClick="setupGame"
+          onMouseEnter="onNewGameTeamHover"
+          onMouseExit="onNewGameTeamUnhover"
+          color="#FFFFFF"
+          textColor="#000000"
+          visibility="hidden"/>
+
+  <!-- active player panel -->
+  <Button id="playerTurn"
+    anchorMin="1 0.5" anchorMax="1 0.5"
+    position="-50 310"
+    width="300" height="120"
+    rectAlignment="MiddleRight"
+    color="#222222"
+    interactable="false">
+
+    <VerticalLayout spacing="0" padding="10 10 10 10">
+
+      <Text id="activePlayer"
+        text="Active Player:" fontSize="24"
+        color="#FFFFFF" alignment="MiddleCenter"
+        interactable="false" />
+
+      <Text id="playerName" text="" fontSize="40" alignment="MiddleCenter" raycastTarget="false" />
+
+    </VerticalLayout>
+  </Button>
+
+  <Image id="turnOrderImage"
+  anchorMin="1 0.5" anchorMax="1 0.5"
+  position="-410 310"
+  width="100" height="100"
+  image="arrowCW"
+  visibility = "hidden"
+  preserveAspect="true"
+  raycastTarget="false" />
+
+  <!-- button to skip turn of active player -->
+  <Button id="skipButton"
+      anchorMin="1 0.5" anchorMax="1 0.5"
+      position="-50 200"
+      width="300" height="40"
+      rectAlignment="LowerRight"
+      text="Skip turn"
+      fontSize="22"
+      onClick="nextTurn"
+      onMouseEnter="onSkipHover"
+      onMouseExit="onSkipUnhover"
+      color="#FFFFFF"
+      textColor="#000000"
+      visibility="hidden"/>
+
+  <!-- display for accumulated field damage -->
+  <Button id="damagePanel"
+    anchorMin="1 0.5" anchorMax="1 0.5"
+    position="-50 130"
+    width="300" height="120"
+    rectAlignment="MiddleRight"
+    color="#222222"
+    interactable="false">
+
+    <VerticalLayout spacing="0" padding="10 10 10 10">
+
+      <Text id="damageText"
+        text="Damage:" fontSize="24"
+        color="#FFFFFF" alignment="MiddleCenter"
+        interactable="false" />
+
+      <Text id="damageCounter" text="" fontSize="40" alignment="MiddleCenter" raycastTarget="false" />
+
+    </VerticalLayout>
+  </Button>
+
+  <!-- button to take field damage -->
+  <Button id="takeDamageButton"
+      anchorMin="1 0.5" anchorMax="1 0.5"
+      position="-50 20"
+      width="300" height="40"
+      rectAlignment="LowerRight"
+      text="Take Damage"
+      fontSize="22"
+      onClick="clickTakeDamage"
+      onMouseEnter="onTakeDamageHover"
+      onMouseExit="onTakeDamageUnhover"
+      color="#FFFFFF"
+      textColor="#000000"
+      visibility="hidden"/>
+
+  <!-- elements info bottom right -->
+  <Panel id="bottomRightImagePanel"
+    anchorMin="1 0" anchorMax="1 0"
+    position="-200 170"
+    width="255" height="140"
+    rectAlignment="bottom right"
+    allowDragging="false"
+    raycastTarget="false">
+
+    <Image id="elementsImage"
+      image="myElementsImage"
+      preserveAspect="true"
+      raycastTarget="false" />
+  </Panel>
+
+  <!-- info-Button -->
+  <Button id="infoButton"
+    anchorMin="1 0" anchorMax="1 0"
+    position="-100 25"
+    width="150" height="40"
+    rectAlignment="LowerRight"
+    text="Show Info"
+    fontSize="22"
+    onClick="toggleInfoOverlay"
+    onMouseEnter="onInfoHover"
+    onMouseExit="onInfoUnhover"
+    color="#FFFFFF"
+    textColor="#000000" />
+
+  <!-- info-Overlay -->
+  <Panel id="infoOverlay"
+    width="75%" height="75%"
+    rectAlignment="MiddleCenter"
+    visibility="hidden"
+    allowDragging="false"
+    raycastTarget="true">
+
+    <Image id="infoImage"
+      image="myInfoImage"
+      preserveAspect="true"
+      raycastTarget="true" />
+  </Panel>
+
+  <!-- rules-Button -->
+  <Button id="rulesButton"
+    anchorMin="1 0" anchorMax="1 0"
+    position="-265 25"
+    width="150" height="40"
+    rectAlignment="LowerRight"
+    text="Show Rules"
+    fontSize="22"
+    onClick="toggleRulesOverlay"
+    onMouseEnter="onRulesHover"
+    onMouseExit="onRulesUnhover"
+    color="#FFFFFF"
+    textColor="#000000"/>
+
+  <!-- rules-Overlay -->
+  <Panel id="rulesOverlay"
+    width="75%" height="75%"
+    rectAlignment="MiddleCenter"
+    visibility="hidden"
+    allowDragging="false"
+    raycastTarget="true">
+
+    <Image id="rulesImage"
+      image="myRulesImage"
+      preserveAspect="true"
+      raycastTarget="true" />
+  </Panel>
+
+  <!-- bot button -->
+    <Button id="botButton"
+      anchorMin="1 0" anchorMax="1 0"
+      position="-430 25"
+      width="150" height="40"
+      rectAlignment="LowerRight"
+      text="NPCs: ON"
+      fontSize="22"
+      onClick="toggleBotMode"
+      onMouseEnter="onBotHover"
+      onMouseExit="onBotUnhover"
+      color="#FFFFFF"
+      textColor="#000000"/>
+
+      <!-- team button -->
+      <Button id="teamButton"
+        anchorMin="1 0" anchorMax="1 0"
+        position="-600 25"
+        width="150" height="40"
+        rectAlignment="LowerRight"
+        text="Team: Off"
+        fontSize="22"
+        onClick="toggleTeamMode"
+        onMouseEnter="onTeamHover"
+        onMouseExit="onTeamUnhover"
+        color="#FFFFFF"
+        textColor="#000000"/>
+
+  <!-- choice buttons for hand swap -->
+  <Panel id="swapChoicePanel"
+    width="400" height="300"
+    rectAlignment="MiddleCenter"
+    visibility="hidden"
+    color="#222222"
+    allowDragging="false"
+    raycastTarget="true">
+
+    <VerticalLayout spacing="10" padding="15 15 15 15" childForceExpandWidth="true" childAlignment="MiddleCenter">
+      <Text text="Choose a player to swap hands:" fontSize="26" color="#FFFFFF" />
+      <Button id="swapWithBlue" text="Blue" onClick="swapWithPlayer" fontSize="22" width="200" height="40" />
+      <Button id="swapWithRed" text="Red" onClick="swapWithPlayer" fontSize="22" width="200" height="40" />
+      <Button id="swapWithGreen" text="Green" onClick="swapWithPlayer" fontSize="22" width="200" height="40" />
+      <Button id="swapWithYellow" text="Yellow" onClick="swapWithPlayer" fontSize="22" width="200" height="40" />
+    </VerticalLayout>
+  </Panel>
+
+  <!-- temporary textpanel which is shown when bot has turn and is thinking -->
+  <Panel id="botThinkingPanel"
+    position="0 200"
+    width="500" height="100"
+    rectAlignment="MiddleCenter"
+    visibility="hidden"
+    color="#000000AA"
+    allowDragging="false">
+
+    <Text id="botThinkingText"
+      text="Bot denkt nach..."
+      fontSize="32"
+      color="#FFFFFF"
+      alignment="MiddleCenter" />
+    </Panel>
+</Canvas>
