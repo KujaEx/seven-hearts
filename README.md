@@ -71,25 +71,25 @@ This section describes how NPCs choose which card to play. If the hand is empty,
 
 ## FAQ
 
-**Why not "Blade" or "Vantage Master"?**
+**Why not "Blade" or "Vantage Master"?**  
 I've played all (english) Trails games. I loved both "Blade" and "Vantage Master", but back when Blade came out (Cold Steel I & II), I didn’t have time — or Tabletop Simulator wasn't around yet. Vantage Master is just too complex (more like Hearthstone). When "Trails through Daybreak II" released in English in 2025, I liked the simplicity of Seven Hearts and decided to code it. Maybe I’ll do Blade someday — it’s even simpler.
 
-**Why use "NPCs" in-game but "bots" in code?**
+**Why use "NPCs" in-game but "bots" in code?**  
 “Bots” has a negative connotation these days, especially in social media. “NPCs” is a more game-appropriate term. But in code, "bot" is more concise and conventional.
 
-**Where do the images come from?**
+**Where do the images come from?**  
 Card and info images are from *Trails through Daybreak II* by Falcom. The rules sketch and bot icons were created by me using Microsoft Co-Pilot and further edited in Photoshop to match the game's style.
 
-**Is the code free to use?**
+**Is the code free to use?**  
 Yes, it's licensed under MIT. That covers the code, not the images (which are not hosted on GitHub and retain their original rights).
 
-**Why do bots have a "thinking" delay?**
+**Why do bots have a "thinking" delay?**  
 Two reasons:
 1. **Atmosphere** – Instant NPC turns feel unnatural. A 3-second pause simulates real human gameplay, but it can be adjusted with the variables at the beginning of the code (`botThinkingTime`)
 2. **Code faster than Physics** – Some game elements check 3D objects, which may not have finished moving when a script runs. So I use `Wait.time` to avoid conflicts and make sure objects are settled before proceeding.
 
-**Is the code final? Could it be improved?**
+**Is the code final? Could it be improved?**  
 Definitely! For better stability, card handling could rely on GUIDs instead of names. But for simplicity and readability, I chose string-based logic. NPC logic could also be expanded (e.g., prefer "Refreshing Veil" when the last player has 0 cards), but I stopped at a good balance between complexity and clarity.
 
-**What’s your favorite Trails game?**
+**What’s your favorite Trails game?**  
 I love the whole series, but the Crossbell Remaster arc on Switch was a standout. Still, the original trilogy remains my favorite. Estelle is the best protagonist so far (and only female one!), and Kevin in part 3 is just awesome — I can’t wait for his return in part 13 (*Trails Beyond the Horizon*)!
