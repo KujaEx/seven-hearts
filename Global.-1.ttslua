@@ -334,9 +334,9 @@ function showCounter()
   local count = 0
 
   for _, obj in ipairs(objects) do
-    if obj.tag == "Deck" then
+    if obj.type == "Deck" then
       count = count + obj.getQuantity()
-    elseif obj.tag == "Card" then
+    elseif obj.type == "Card" then
       count = count + 1
     end
   end
@@ -428,7 +428,7 @@ end
 function findDeckInZone(zone)
   local objects = zone.getObjects()
   for _, obj in ipairs(objects) do
-    if obj.tag == "Deck" or obj.tag == "Card" then
+    if obj.type == "Deck" or obj.type == "Card" then
       return obj
     end
   end
@@ -493,17 +493,26 @@ function nextTurn()
   end
 end
 
+-- return card to hand of player color
 function returnCardToHand(playerColor, card)
-    -- get the position of the hand of the player
-    local handPos = Player[playerColor].getHandTransform(1).position
+  -- simple way, deal back to hand
+  --[[
+  Wait.time(function()
+      card.deal(1, playerColor)
+  end, 0.1)
+  ]]
 
-    -- raise the position a bit so it doesn't stick in the table
-    handPos.y = handPos.y + 2
+  -- prefer "manual way" for smooth animation to hand
+  -- get the position of the hand of the player
+  local handPos = Player[playerColor].getHandTransform(1).position
 
-    -- optional: wait a bit to give the card back on hand so transition is more smooth
-    Wait.time(function()
-        card.setPositionSmooth(handPos, false, true)
-    end, 0.1)
+  -- raise the position a bit so it doesn't stick in the table
+  handPos.y = handPos.y + 2
+
+  -- optional: wait a bit to give the card back more smooth
+  Wait.time(function()
+      card.setPositionSmooth(handPos, false, true)
+  end, 0.1)
 end
 
 -- check if card is in zone (faster than containsObject)
@@ -511,10 +520,13 @@ function isCardInZone(card, zone)
   local zonePos = zone.getPosition()
   local cardPos = card.getPosition()
 
+  local sizeX = zone.getScale().x
+  local sizeZ = zone.getScale().z
+
   local dx = math.abs(zonePos.x - cardPos.x)
   local dz = math.abs(zonePos.z - cardPos.z)
 
-  return dx < 5 and dz < 5
+  return dx < sizeX and dz < sizeZ
 end
 
 function isFromAnotherHandZone(playerColor, object)
@@ -542,7 +554,7 @@ end
 function lockAllCardsInZone(zone)
   local objects = zone.getObjects()
   for _, obj in ipairs(objects) do
-    if obj.tag == "Card" then
+    if obj.type == "Card" then
       obj.interactable = false
     end
   end
@@ -806,7 +818,7 @@ function setupGame()
 
   -- destruct all cards
   for _, obj in ipairs(getAllObjects()) do
-    if obj.tag == "Card" or obj.tag == "Deck" then
+    if obj.type == "Card" or obj.type == "Deck" then
       obj.destruct()
     end
   end
@@ -1067,7 +1079,7 @@ function clearDropZone()
   -- collect cards from drop zone
   local cardsToMove = {}
   for _, obj in ipairs(dropZone.getObjects()) do
-    if obj.tag == "Card" then
+    if obj.type == "Card" then
       table.insert(cardsToMove, obj)
     end
   end
@@ -1120,7 +1132,7 @@ function swapHands(colorA, colorB)
       -- get card objects and transfer
       local playerHand = Player[color].getHandObjects()
       for _, item in ipairs(playerHand) do
-        if item.tag == 'Card' then
+        if item.type == 'Card' then
           item.deal(1, target)
         end
       end
@@ -1184,7 +1196,7 @@ function playCardToDropZone(cardObject)
   -- count cards in drop zone for drop height
   local stackCount = 0
   for _, obj in ipairs(dropZone.getObjects()) do
-    if obj.tag == "Card" then
+    if obj.type == "Card" then
       stackCount = stackCount + 1
     end
   end
@@ -1218,7 +1230,7 @@ function giveLastCardToPlayer(playerColor)
   local lastCard = nil
 
   for _, obj in ipairs(objects) do
-    if obj.tag == "Card" then
+    if obj.type == "Card" then
       lastCard = obj
       break
     end
@@ -1492,6 +1504,17 @@ function botDecidesHandSwap()
   end, 1)
 end
 
+-- get player name by index, return color or steam name
+-- currently not used because too long steam names would lead to problems in UI
+function getPlayerName(index)
+  -- return steam name if seated player
+  if Player[PLAYERS_ORDER[index]].seated then
+    return Player[PLAYERS_ORDER[index]].steam_name
+  else
+    return PLAYERS_ORDER[index]
+  end
+end
+
 -- helper function: is element in table
 function contains(tbl, value)
   for _, v in ipairs(tbl) do
@@ -1544,8 +1567,12 @@ end
 
 --[[ functions triggered by event handlers]]
 function onObjectDropped(playerColor, droppedObject)
-  if droppedObject.tag ~= "Card" then return end
+  -- only consider conditions on cards
+  if droppedObject.type ~= "Card" then return end
+
+  -- only consider conditions if card was allowed to be picked up
   if playerColor ~= PLAYERS_ORDER[activePlayer] then return end
+  if not canBePlayed(droppedObject) then return end
 
   -- check if card was put in drop zone
   if not isCardInZone(droppedObject, dropZone) then
@@ -1554,32 +1581,35 @@ function onObjectDropped(playerColor, droppedObject)
     return
   end
 
-  -- check if it is legal to play the card
-  if not canBePlayed(droppedObject) then
-    printToColor("You can't play this card!", playerColor, {1, 0.5, 0})
-    returnCardToHand(playerColor, droppedObject)
-    return
-  end
-
   -- move card to drop zone and play effect
   playCardToDropZone(droppedObject)
 end
 
-function onObjectPickedUp(playerColor, object)
-  if object.tag ~= "Card" then return end
+function onObjectPickedUp(playerColor, pickedObject)
+  if pickedObject.type ~= "Card" then return end
 
   -- only allow cards to move from own hand
-  local wasFromOtherHand, originalOwner = isFromAnotherHandZone(playerColor, object)
+  local wasFromOtherHand, originalOwner =
+    isFromAnotherHandZone(playerColor, pickedObject)
+
   if wasFromOtherHand then
-    printToColor("You are not allowed to take the cards of player " .. originalOwner .. "!", playerColor, {1, 0, 0})
-    returnCardToHand(originalOwner, object)
+    printToColor("You are not allowed to take the cards of player " ..
+      originalOwner .. "!", playerColor, {1, 0, 0})
+    returnCardToHand(originalOwner, pickedObject)
     return
   end
 
   -- is it the active player?
   if playerColor ~= PLAYERS_ORDER[activePlayer] then
     printToColor("It's not your turn!", playerColor, {1, 0, 0})
-    returnCardToHand(playerColor, object)
+    returnCardToHand(playerColor, pickedObject)
+    return
+  end
+
+  -- check if it is legal to play the card
+  if not canBePlayed(pickedObject) then
+    printToColor("You can't play this card!", playerColor, {1, 0.5, 0})
+    returnCardToHand(playerColor, pickedObject)
     return
   end
 end
@@ -1594,7 +1624,7 @@ function tryObjectEnterContainer(container, obj)
     end
   end
 
-  if inNoMergeZone and obj.tag == "Card" then
+  if inNoMergeZone and obj.type == "Card" then
     return false
   end
   return true
