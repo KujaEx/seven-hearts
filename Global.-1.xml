@@ -9,8 +9,8 @@
     raycastTarget="false">
     <Button id="startButton"
       onClick="startGame"
-      onMouseEnter="onStartGameHover"
-      onMouseExit="onStartGameUnhover"
+      onMouseEnter="onButtonHover"
+      onMouseExit="onButtonUnhover"
       text="Start Game"
       fontSize="30"
       width="250" height="60" />
@@ -144,8 +144,8 @@
       text="New Game"
       fontSize="22"
       onClick="setupGame"
-      onMouseEnter="onNewGameHover"
-      onMouseExit="onNewGameUnhover"
+      onMouseEnter="onButtonHover"
+      onMouseExit="onButtonUnhover"
       color="#FFFFFF"
       textColor="#000000"
       visibility="hidden"/>
@@ -159,8 +159,8 @@
           text="New Game"
           fontSize="22"
           onClick="setupGame"
-          onMouseEnter="onNewGameTeamHover"
-          onMouseExit="onNewGameTeamUnhover"
+          onMouseEnter="onButtonHover"
+          onMouseExit="onButtonUnhover"
           color="#FFFFFF"
           textColor="#000000"
           visibility="hidden"/>
@@ -204,8 +204,8 @@
       text="Skip turn"
       fontSize="22"
       onClick="nextTurn"
-      onMouseEnter="onSkipHover"
-      onMouseExit="onSkipUnhover"
+      onMouseEnter="onButtonHover"
+      onMouseExit="onButtonUnhover"
       color="#FFFFFF"
       textColor="#000000"
       visibility="hidden"/>
@@ -240,8 +240,8 @@
       text="Take Damage"
       fontSize="22"
       onClick="clickTakeDamage"
-      onMouseEnter="onTakeDamageHover"
-      onMouseExit="onTakeDamageUnhover"
+      onMouseEnter="onButtonHover"
+      onMouseExit="onButtonUnhover"
       color="#FFFFFF"
       textColor="#000000"
       visibility="hidden"/>
@@ -270,8 +270,8 @@
     text="Show Info"
     fontSize="22"
     onClick="toggleInfoOverlay"
-    onMouseEnter="onInfoHover"
-    onMouseExit="onInfoUnhover"
+    onMouseEnter="onButtonHover"
+    onMouseExit="onButtonUnhover"
     color="#FFFFFF"
     textColor="#000000" />
 
@@ -298,8 +298,8 @@
     text="Show Rules"
     fontSize="22"
     onClick="toggleRulesOverlay"
-    onMouseEnter="onRulesHover"
-    onMouseExit="onRulesUnhover"
+    onMouseEnter="onButtonHover"
+    onMouseExit="onButtonUnhover"
     color="#FFFFFF"
     textColor="#000000"/>
 
@@ -326,8 +326,8 @@
       text="NPCs: ON"
       fontSize="22"
       onClick="toggleBotMode"
-      onMouseEnter="onBotHover"
-      onMouseExit="onBotUnhover"
+      onMouseEnter="onButtonHover"
+      onMouseExit="onButtonUnhover"
       color="#FFFFFF"
       textColor="#000000"/>
 
@@ -340,8 +340,8 @@
         text="Team: Off"
         fontSize="22"
         onClick="toggleTeamMode"
-        onMouseEnter="onTeamHover"
-        onMouseExit="onTeamUnhover"
+        onMouseEnter="onButtonHover"
+        onMouseExit="onButtonUnhover"
         color="#FFFFFF"
         textColor="#000000"/>
 

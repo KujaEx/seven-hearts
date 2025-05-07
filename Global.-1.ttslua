@@ -94,14 +94,14 @@ function onLoad()
   startTimerDamageCounter()
 end
 
--- color start button red if hovered with mouse
-function onStartGameHover(player_color, ui_element_id)
-    UI.setAttribute("startButton", "color", "#FF4444")
+-- color button red if hovered with mouse
+function onButtonHover(playerColor, value, uiElementID)
+    UI.setAttribute(uiElementID, "color", "#FF4444")
 end
 
--- color bot button white if not hovered with mouse
-function onStartGameUnhover(player_color, ui_element_id)
-    UI.setAttribute("startButton", "color", "#FFFFFF")
+-- color button white if not hovered with mouse
+function onButtonUnhover(playerColor, value, uiElementID)
+    UI.setAttribute(uiElementID, "color", "#FFFFFF")
 end
 
 -- toogle if bots are used for unseated players
@@ -114,16 +114,6 @@ function toggleBotMode()
       playersBotAvatars[i].setInvisibleTo(PLAYERS_ORDER)
     end
   end
-end
-
--- color bot button red if hovered with mouse
-function onBotHover(player_color, ui_element_id)
-    UI.setAttribute("botButton", "color", "#FF4444")
-end
-
--- color bot button white if not hovered with mouse
-function onBotUnhover(player_color, ui_element_id)
-    UI.setAttribute("botButton", "color", "#FFFFFF")
 end
 
 -- toogle if teams are made between red/yellow and blue/green
@@ -139,16 +129,6 @@ function toggleTeamMode()
     UI.setAttribute("counterPanelTeam", "visibility", "hidden")
     UI.setAttribute("counterPanel", "visibility", "")
   end
-end
-
--- color team button red if hovered with mouse
-function onTeamHover(player_color, ui_element_id)
-    UI.setAttribute("teamButton", "color", "#FF4444")
-end
-
--- color team button white if not hovered with mouse
-function onTeamUnhover(player_color, ui_element_id)
-    UI.setAttribute("teamButton", "color", "#FFFFFF")
 end
 
 -- toogle if player sees info overlay
@@ -187,16 +167,6 @@ function updateInfoOverlayVisibility()
   UI.setAttribute("infoOverlay", "visibility", visibleFor)
 end
 
--- color info button red if hovered with mouse
-function onInfoHover(player_color, ui_element_id)
-    UI.setAttribute("infoButton", "color", "#FF4444")
-end
-
--- color info button white if not hovered with mouse
-function onInfoUnhover(player_color, ui_element_id)
-    UI.setAttribute("infoButton", "color", "#FFFFFF")
-end
-
 -- toogle if player sees rules overlay
 function toggleRulesOverlay(player, _, _)
   local color = player.color
@@ -233,56 +203,7 @@ function updateRulesOverlayVisibility()
   UI.setAttribute("rulesOverlay", "visibility", visibleFor)
 end
 
--- color rules button red if hovered with mouse
-function onRulesHover(player_color, ui_element_id)
-    UI.setAttribute("rulesButton", "color", "#FF4444")
-end
-
--- color rules button white if not hovered with mouse
-function onRulesUnhover(player_color, ui_element_id)
-    UI.setAttribute("rulesButton", "color", "#FFFFFF")
-end
-
--- color skip button red if hovered with mouse
-function onSkipHover(player_color, ui_element_id)
-    UI.setAttribute("skipButton", "color", "#FF4444")
-end
-
--- color skip button white if not hovered with mouse
-function onSkipUnhover(player_color, ui_element_id)
-    UI.setAttribute("skipButton", "color", "#FFFFFF")
-end
-
--- color take damage button red if hovered with mouse
-function onTakeDamageHover(player_color, ui_element_id)
-    UI.setAttribute("takeDamageButton", "color", "#FF4444")
-end
-
--- color dake damage button white if not hovered with mouse
-function onTakeDamageUnhover(player_color, ui_element_id)
-    UI.setAttribute("takeDamageButton", "color", "#FFFFFF")
-end
-
--- color new game button red if hovered with mouse
-function onNewGameHover(player_color, ui_element_id)
-    UI.setAttribute("newGameButton", "color", "#FF4444")
-end
-
--- color new game button white if not hovered with mouse
-function onNewGameUnhover(player_color, ui_element_id)
-    UI.setAttribute("newGameButton", "color", "#FFFFFF")
-end
-
--- color new game button for teams red if hovered with mouse
-function onNewGameTeamHover(player_color, ui_element_id)
-    UI.setAttribute("newGameButtonTeam", "color", "#FF4444")
-end
-
--- color new game button for teams white if not hovered with mouse
-function onNewGameTeamUnhover(player_color, ui_element_id)
-    UI.setAttribute("newGameButtonTeam", "color", "#FFFFFF")
-end
-
+-- change image for turn order
 function updateTurnOrderImage()
   local imageName = reverseTurnOrder and "arrowCCW" or "arrowCW"
   UI.setAttribute("turnOrderImage", "image", imageName)
@@ -334,9 +255,9 @@ function showCounter()
   local count = 0
 
   for _, obj in ipairs(objects) do
-    if obj.type == "Deck" then
+    if obj.tag == "Deck" then
       count = count + obj.getQuantity()
-    elseif obj.type == "Card" then
+    elseif obj.tag == "Card" then
       count = count + 1
     end
   end
@@ -428,7 +349,7 @@ end
 function findDeckInZone(zone)
   local objects = zone.getObjects()
   for _, obj in ipairs(objects) do
-    if obj.type == "Deck" or obj.type == "Card" then
+    if obj.tag == "Deck" or obj.tag == "Card" then
       return obj
     end
   end
@@ -493,7 +414,7 @@ function nextTurn()
   end
 end
 
--- return card to hand of player color
+-- return card to a player hand smooth with a bit delay
 function returnCardToHand(playerColor, card)
   -- simple way, deal back to hand
   --[[
@@ -502,7 +423,7 @@ function returnCardToHand(playerColor, card)
   end, 0.1)
   ]]
 
-  -- prefer "manual way" for smooth animation to hand
+  -- prefer "manual way" because of movement to the nearest last hand position
   -- get the position of the hand of the player
   local handPos = Player[playerColor].getHandTransform(1).position
 
@@ -554,7 +475,7 @@ end
 function lockAllCardsInZone(zone)
   local objects = zone.getObjects()
   for _, obj in ipairs(objects) do
-    if obj.type == "Card" then
+    if obj.tag == "Card" then
       obj.interactable = false
     end
   end
@@ -575,6 +496,7 @@ function reachedGameEnd()
   return false
 end
 
+-- called function if game end is reached
 function endGame()
   printToAll("End of Game!")
   UI.setAttribute("skipButton", "visibility", "hidden")
@@ -818,7 +740,7 @@ function setupGame()
 
   -- destruct all cards
   for _, obj in ipairs(getAllObjects()) do
-    if obj.type == "Card" or obj.type == "Deck" then
+    if obj.tag == "Card" or obj.tag == "Deck" then
       obj.destruct()
     end
   end
@@ -1071,6 +993,7 @@ function takeDamage()
   clearDropZone()
 end
 
+-- move all cards from drop to discard zone
 function clearDropZone()
   -- get target position from discard zone
   local discardPos = discardZone.getPosition()
@@ -1079,7 +1002,7 @@ function clearDropZone()
   -- collect cards from drop zone
   local cardsToMove = {}
   for _, obj in ipairs(dropZone.getObjects()) do
-    if obj.type == "Card" then
+    if obj.tag == "Card" then
       table.insert(cardsToMove, obj)
     end
   end
@@ -1098,6 +1021,7 @@ function clearDropZone()
   cardsInDropZone = 0
 end
 
+-- swap hands of target and active player
 function swapWithPlayer(player, value, id)
   local targetColor = string.gsub(id, "swapWith", "")
   if targetColor == PLAYERS_ORDER[activePlayer] then
@@ -1132,7 +1056,7 @@ function swapHands(colorA, colorB)
       -- get card objects and transfer
       local playerHand = Player[color].getHandObjects()
       for _, item in ipairs(playerHand) do
-        if item.type == 'Card' then
+        if item.tag == 'Card' then
           item.deal(1, target)
         end
       end
@@ -1196,7 +1120,7 @@ function playCardToDropZone(cardObject)
   -- count cards in drop zone for drop height
   local stackCount = 0
   for _, obj in ipairs(dropZone.getObjects()) do
-    if obj.type == "Card" then
+    if obj.tag == "Card" then
       stackCount = stackCount + 1
     end
   end
@@ -1230,7 +1154,7 @@ function giveLastCardToPlayer(playerColor)
   local lastCard = nil
 
   for _, obj in ipairs(objects) do
-    if obj.type == "Card" then
+    if obj.tag == "Card" then
       lastCard = obj
       break
     end
@@ -1568,7 +1492,7 @@ end
 --[[ functions triggered by event handlers]]
 function onObjectDropped(playerColor, droppedObject)
   -- only consider conditions on cards
-  if droppedObject.type ~= "Card" then return end
+  if droppedObject.tag ~= "Card" then return end
 
   -- only consider conditions if card was allowed to be picked up
   if playerColor ~= PLAYERS_ORDER[activePlayer] then return end
@@ -1586,7 +1510,7 @@ function onObjectDropped(playerColor, droppedObject)
 end
 
 function onObjectPickedUp(playerColor, pickedObject)
-  if pickedObject.type ~= "Card" then return end
+  if pickedObject.tag ~= "Card" then return end
 
   -- only allow cards to move from own hand
   local wasFromOtherHand, originalOwner =
@@ -1624,7 +1548,7 @@ function tryObjectEnterContainer(container, obj)
     end
   end
 
-  if inNoMergeZone and obj.type == "Card" then
+  if inNoMergeZone and obj.tag == "Card" then
     return false
   end
   return true
